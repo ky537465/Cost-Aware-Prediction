@@ -9,7 +9,6 @@ from pytorch_tabnet.tab_model import TabNetClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import accuracy_score
 
-# 1. GPU DIAGNOSTICS
 torch.cuda.empty_cache() 
 
 if torch.cuda.is_available():
@@ -17,10 +16,8 @@ if torch.cuda.is_available():
 else:
     sys.exit()
 
-# 2. LOAD DATA
 df = pd.read_csv("borg_traces_data.csv")
 
-# 3. CLEANING & FLATTENING
 def clean_bracket_strings(x):
     if str(x).strip() == '[]' or x is None:
         return 0
@@ -44,7 +41,6 @@ for col in complex_cols:
 
 df = df.fillna(0)
 
-# 4. PREPARE FEATURES AND TARGET
 target = 'failed'
 unused_cols = ['time', 'instance_id', 'collection_id']
 features = [col for col in df.columns if col not in [target] + unused_cols]
@@ -61,7 +57,6 @@ for i, col in enumerate(features):
 X = df[features].values.astype(np.float32)
 y = df[target].values.astype(int)
 
-# 5. INITIALIZE TABNET
 clf = TabNetClassifier(
     cat_idxs=cat_idxs,
     cat_dims=cat_dims,
@@ -70,10 +65,9 @@ clf = TabNetClassifier(
     optimizer_params=dict(lr=1e-3),
     mask_type='sparsemax',
     device_name=device,
-    verbose=0  # <--- THIS SILENCES ALL OUTPUT FOR THE LIFE OF THE MODEL
+    verbose=0
 )
 
-# 6. SEQUENTIAL PROCESSING WITH BUFFERED TRAINING
 predictions = []
 actuals = []
 cumulative_accuracies = []
@@ -100,7 +94,6 @@ for i in range(len(X)):
     y_buffer.append(y[i])
 
     if len(X_buffer) >= buffer_size:
-        # Removed verbose=0 from here as it caused the TypeError
         clf.fit(
             X_train=np.array(X_buffer), 
             y_train=np.array(y_buffer),
@@ -114,7 +107,6 @@ for i in range(len(X)):
         X_buffer = []
         y_buffer = []
 
-# 7. FINAL VISUALIZATION
 if cumulative_accuracies:
     plt.figure(figsize=(10, 5))
     plt.plot(range(0, len(cumulative_accuracies)*1000, 1000), cumulative_accuracies)

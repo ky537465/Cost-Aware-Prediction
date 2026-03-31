@@ -9,14 +9,11 @@ from pytorch_tabnet.tab_model import TabNetClassifier
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import balanced_accuracy_score
 
-# 1. GPU DIAGNOSTICS
 torch.cuda.empty_cache() 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# 2. LOAD DATA
 df = pd.read_csv("borg_traces_data.csv")
 
-# 3. CLEANING & FLATTENING
 def safe_eval(x):
     if pd.isna(x) or str(x).strip() in ['[]', '', 'None']:
         return {}
@@ -36,13 +33,10 @@ for col in complex_cols:
 
 df = df.fillna(0)
 
-# 4. PREPARE FEATURES AND TARGET
 target = 'failed'
 unused_cols = ['time', 'instance_id', 'collection_id']
 features = [col for col in df.columns if col not in [target] + unused_cols]
 
-# Calculate class distribution for the "weights" parameter in fit()
-# 0 = Success, 1 = Failure. If failures are 10x rarer, we weight them 10x.
 num_fail = df[target].sum()
 num_success = len(df) - num_fail
 fail_weight = int(num_success / max(num_fail, 1))
@@ -59,7 +53,6 @@ for i, col in enumerate(features):
 X = df[features].values.astype(np.float32)
 y = df[target].values.astype(int)
 
-# 5. INITIALIZE TABNET (Standard Init)
 clf = TabNetClassifier(
     cat_idxs=cat_idxs,
     cat_dims=cat_dims,
@@ -76,7 +69,6 @@ clf = TabNetClassifier(
     verbose=0
 )
 
-# 6. SEQUENTIAL PROCESSING WITH EXPERIENCE REPLAY
 predictions = []
 actuals = []
 cumulative_accuracies = []
@@ -98,7 +90,6 @@ for i in range(len(X)):
         actuals.append(y_line)
         
         if i > 0 and i % window_size == 0:
-            # Balanced accuracy handles the "Rare Failure" problem much better
             current_acc = balanced_accuracy_score(actuals[-window_size:], predictions[-window_size:])
             cumulative_accuracies.append(current_acc)
             print(f"Index {i}: Recent Balanced Acc = {current_acc:.4f}")
@@ -109,8 +100,6 @@ for i in range(len(X)):
     if len(X_memory) >= 128:
         idx = np.random.choice(len(X_memory), 64, replace=False)
         
-        # We pass 'weights=1' to tell TabNet to automatically handle 
-        # class imbalance based on the y_train provided in this batch.
         clf.fit(
             X_train=np.array(X_memory)[idx], 
             y_train=np.array(y_memory)[idx],
@@ -120,14 +109,13 @@ for i in range(len(X)):
             virtual_batch_size=32,
             drop_last=False,
             compute_importance=False,
-            weights=1 # <--- Tells TabNet to calculate weights for this batch
+            weights=1
         )
         
         if len(X_memory) > memory_limit:
             X_memory.pop(0)
             y_memory.pop(0)
 
-# 7. FINAL VISUALIZATION
 plt.figure(figsize=(12, 6))
 plt.plot(range(window_size, (len(cumulative_accuracies)+1)*window_size, window_size), cumulative_accuracies, marker='o', color='#2ca02c')
 plt.axhline(y=0.5, color='r', linestyle='--', label='Random Chance')

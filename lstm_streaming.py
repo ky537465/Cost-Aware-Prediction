@@ -2,7 +2,6 @@ import numpy as np
 import os
 from tensorflow.keras.callbacks import CSVLogger
 
-# Global Variables
 FILENAME = 'borg_traces_lstm_data.csv'
 BATCH_SIZE = 128
 WINDOW_SIZE = 24
@@ -10,7 +9,6 @@ FEATURE_COLS = ['cpu_req', 'mem_req', 'cpu_avg', 'mem_avg', 'priority', 'schedul
 TARGET_COL = 'failed'
 SELECT_COLS = FEATURE_COLS + [TARGET_COL]
 
-# Streaming reads csv in chunks
 def get_dataset(file_path):
     dataset = tf.data.experimental.make_csv_dataset(
         file_path,
@@ -21,7 +19,6 @@ def get_dataset(file_path):
         ignore_errors=True
     )
 
-    # Convert dictionary to a tensor
     def pack_features(features, label):
         features_tensor = tf.stack([tf.cast(features[col], tf.float32) for col in FEATURE_COLS], axis=-1)
         return tf.squeeze(features_tensor, axis=0), label
@@ -31,7 +28,6 @@ def get_dataset(file_path):
     dataset = dataset.flat_map(lambda x, y: tf.data.Dataset.zip((x.batch(WINDOW_SIZE), y.skip(WINDOW_SIZE-1).take(1))))
     return dataset.shuffle(1000).batch(BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
 
-# Setting up the model
 model = tf.keras.Sequential([
     tf.keras.layers.LSTM(128, return_sequences=True, input_shape=(WINDOW_SIZE, len(FEATURE_COLS)),
                          recurrent_dropout=0.01, activation='tanh'),
@@ -43,10 +39,7 @@ model = tf.keras.Sequential([
 
 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
-# Logging data
 csv_logger = CSVLogger('training_results.csv', append=False, separator=',')
-
-# Training
 streamed_train_ds = get_dataset(FILENAME)
 
 print("Starting streaming training and logging results...")
@@ -56,7 +49,6 @@ history = model.fit(
     callbacks=[csv_logger]
 )
 
-# Final output
 final_loss = history.history['loss'][-1]
 final_accuracy = history.history['accuracy'][-1]
 
