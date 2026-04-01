@@ -1,11 +1,6 @@
-import numpy as np
-import os
 import sys
 import tensorflow as tf
 from tensorflow.keras.callbacks import Callback
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['TF_DISABLE_CUDNN_RNN'] = '1'
 
 gpus = tf.config.list_physical_devices('GPU')
 if not gpus:
@@ -92,5 +87,4 @@ history = model.fit(
     callbacks=[detailed_logger]
 )
 
-model.save('job_failure_predictor_streaming.h5')
-print(f"Results saved to {RESULTS_FILE}")
+model.save('lstm_job_predictor_streaming.h5')
